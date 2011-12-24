@@ -23,6 +23,9 @@ class FlushDescr:
         self.fd.close(*args, **kwargs)
 
 import sys
+import struct
+import time
+import serial
 sys.stdout = FlushDescr(sys.stdout)
 
 
@@ -125,16 +128,166 @@ class DeviceManager(object):
         dev_serial = dbus.Interface(dev_obj,
             dbus_interface='org.bluez.Serial')
 
+        print "Connecting to serial..",
         tty = dev_serial.Connect(DeviceManager.UUID)
-        print tty
-        dev_serial.Disconnect(self.tty)
+        print "done"
+
+        print "Handing over.."
+        liveview = LiveViewManager(tty)
+        liveview.communicate()
+        print "Communication complete"
+
+        dev_serial.Disconnect(tty)
+
+class Packet(object):
+    ID_ACK = 44
+    STANDBY = 217
+
+    BUTTON_LEFT = 7
+
+    TIME_REQUEST = 38
+    TIME_RESPONSE = 39
+
+    TIME_DATE_REQUEST = 15
+    TIME_DATE_RESPONSE = 16
+
+    def __init__(self, pId = None, length = None, data = None):
+        self.pId = pId
+        self.length = length
+        self.data = data
+
+        if isinstance(self.pId, str): 
+            assert len(self.pId) == 1
+            self.pId = chr(self.pId)
+
+        if self.data is not None and len(self.data) == 0:
+            self.data = None
+
+    def is_complete(self):
+        return self.pId is not None and self.length is not None and \
+            self.data is not None
+
+    def is_ack(self):
+        return self.pId == self.ID_ACK
+
+    def __repr__(self):
+        hexadecimal = ''
+        if self.data:
+            for x in self.data:
+                hexadecimal += '%02X ' % (ord(x),)
+        
+        if len(hexadecimal) > 0:
+            return "<Packet: id %i, length %i, data %s>" % ( self.pId,
+                self.length, hexadecimal.strip())
+        else:
+            return "<Packet: id %i, length %i>" % ( self.pId,
+                self.length)
+
+
+    def __str__(self):
+        if self.length > 0:
+            return struct.pack(">BBI %is" % self.length, self.pId, 4, self.length, self.data)
+        else:
+            return struct.pack(">BBI", self.pId, 4, 0)
 
 class LiveViewManager(object):
     def __init__(self, tty):
         self.tty = tty
+        self.fd = serial.Serial(self.tty, 4800, timeout=0, rtscts=1)
+
+        self.packet = None
+        self.packets = []
+    
+    def consume(self, data):
+        """ Consumes a string of bytes and returns the 
+            number of bytes it expects next
+        """
+        if self.packet is None:
+            assert len(data) == 1
+            self.packet = Packet()
+            self.packet.pId = struct.unpack('>B', data)[0]
+
+            print "packet type: %i" % (self.packet.pId)
+
+            return 5 # byte 0x04 + 4 x bytes for size, in Big-Endian
+        else:
+            if self.packet.length == None:
+                assert len(data) == 5
+                four, length = struct.unpack('>BI', data)
+
+                assert four == 4
+                self.packet.length = length
+
+                print "packet length: %i" % (self.packet.length)
+                return self.packet.length
+            else:
+                assert len(data) == self.packet.length
+                self.packet.data = data
+                self.packets.append(self.packet)
+
+                print "packet data:",
+                for i in self.packet.data:
+                    print "%02X" % ord(i), 
+                print ""
+
+                self.packet = None
+                return 1
+
+    def send(self, packet):
+        print repr(packet),
+        self.fd.write(str(packet))
+        time.sleep(0.1)
+
+    def send_standby(self):
+        print "Sending STANDBY..",
+        tmp = Packet(Packet.STANDBY, 0, '')
+        self.send(tmp)
+        print "sent"
 
     def communicate(self):
-        pass
+        nextRead = 1
+        try:
+            self.send_standby()
+
+            while nextRead > 0:
+                time.sleep(0.1)
+
+                if self.fd.inWaiting() > 0:
+                    tmp = self.fd.read(nextRead)
+                
+                    if len(tmp) > 0:
+                        nextRead = self.consume(tmp)
+
+                        if self.packet is None: # end of prev. packet
+                            packet = self.packets[-1]
+
+                            if not packet.is_ack():
+                                print "Sending ACK..",
+
+                                tmp = Packet(Packet.ID_ACK, 1, chr(packet.pId))
+                                self.send(tmp)
+                                
+                                print "sent"
+
+                            if packet.pId == Packet.BUTTON_LEFT:
+                                self.send_standby()
+
+                            if packet.pId == Packet.TIME_REQUEST:
+                                print "Sending TIME_RESPONSE..",
+                                
+                                localtime = int(time.time()) + 2*3600 
+                                data = struct.pack(">LB", localtime,1)
+
+                                tmp = Packet(Packet.TIME_RESPONSE, len(data), data)
+                                self.send(tmp)
+
+                                print "sent"
+                                print "Localtime is:", localtime
+
+                                self.send_standby()
+        finally:
+            self.fd.close()
+        
 
 if __name__ == "__main__":
     loop = gobject.MainLoop()
@@ -146,5 +299,5 @@ if __name__ == "__main__":
     if len(devs) > 0:
         man.connect_to_first_device()
 
-    timeout_add(16000, lambda: loop.quit())
+    timeout_add(10000, lambda: loop.quit())
     loop.run()

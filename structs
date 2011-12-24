@@ -1,0 +1,19 @@
+== Message Structure == 
+ bytes
+  0 - elementId
+  1 - ElementLenHeaderSize = 4
+  2 - elem length - MSB
+  3 - elem length
+  4 - elem length
+  5 - elem length - LSB
+  6 ... n - payload
+
+== Protocol ==
+  Server      LiveView
+          <-  MSG
+  ACK(44) ->
+
+
+== Time And Date Request (38) ==
+  Response Id - 39 
+  Payload - [Time in sec + Zone Offset + DST offset] [is24Hour - 1 or 0]
