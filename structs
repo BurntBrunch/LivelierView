@@ -8,12 +8,50 @@
   5 - elem length - LSB
   6 ... n - payload
 
+  All numbers seem to be big-endian
+
 == Protocol ==
   Server      LiveView
+
           <-  MSG
   ACK(44) ->
 
 
 == Time And Date Request (38) ==
+  The LiveView device will issue a Time And Date Request if it 
+  doesn't have the current time set.
+
   Response Id - 39 
   Payload - [Time in sec + Zone Offset + DST offset] [is24Hour - 1 or 0]
+
+== Hardware Buttons (7) ==
+  id - 07
+
+  data - 00 - screen off
+         01 - screen on
+         02 - right button while screen on
+
+== Navigation Request (29) ==
+  request id - 29
+  payload - 
+    byte 0 - 0x0
+    byte 1 - 0x3
+      byte 2 - navigation
+        13,14,15 - select
+        1,2,3    - up
+        4,5,6    - down
+        7,8,9    - left
+        10,11,12 - right
+        32       - open
+        16 - 31  - ignore
+
+      byte 3 - position X
+      byte 4 - position Y
+
+  response id - 30
+  payload
+    byte 0 - 0x0 - ok
+             0x1 - error
+             0x3 - ok exit
+             0x4 - ok cancel
+

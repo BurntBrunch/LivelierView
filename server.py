@@ -25,11 +25,15 @@ class FlushDescr:
 import sys
 import struct
 import time
+import calendar
 import serial
 sys.stdout = FlushDescr(sys.stdout)
 
 
 DBusGMainLoop(set_as_default=True)
+
+def get_local_time():
+    return calendar.timegm(time.localtime())
 
 def get_adapter():
     bus = dbus.SystemBus()
@@ -132,24 +136,28 @@ class DeviceManager(object):
         tty = dev_serial.Connect(DeviceManager.UUID)
         print "done"
 
-        print "Handing over.."
+        print "TTY created '%s', proceeding.." % (tty,)
         liveview = LiveViewManager(tty)
         liveview.communicate()
-        print "Communication complete"
-
+        
+        print "TTY no longer needed, disconnecting..",
         dev_serial.Disconnect(tty)
+        print "done"
 
 class Packet(object):
     ID_ACK = 44
-    STANDBY = 217
 
-    BUTTON_LEFT = 7
+    STANDBY_REQUEST = 7
+    STANDBY_RESPONSE = 8
 
     TIME_REQUEST = 38
     TIME_RESPONSE = 39
 
     TIME_DATE_REQUEST = 15
     TIME_DATE_RESPONSE = 16
+
+    NAVIGATION_REQUEST = 29
+    NAVIGATION_RESPONSE = 30
 
     def __init__(self, pId = None, length = None, data = None):
         self.pId = pId
@@ -192,6 +200,7 @@ class Packet(object):
 
 class LiveViewManager(object):
     def __init__(self, tty):
+        self._24hour_clock = False
         self.tty = tty
         self.fd = serial.Serial(self.tty, 4800, timeout=0, rtscts=1)
 
@@ -222,12 +231,12 @@ class LiveViewManager(object):
                 return self.packet.length
             else:
                 assert len(data) == self.packet.length
-                self.packet.data = data
+                self.packet.data = map(ord, data)
                 self.packets.append(self.packet)
 
                 print "packet data:",
                 for i in self.packet.data:
-                    print "%02X" % ord(i), 
+                    print "%02X" % i, 
                 print ""
 
                 self.packet = None
@@ -240,9 +249,44 @@ class LiveViewManager(object):
 
     def send_standby(self):
         print "Sending STANDBY..",
-        tmp = Packet(Packet.STANDBY, 0, '')
+        tmp = Packet(Packet.STANDBY_RESPONSE, 0, '')
         self.send(tmp)
         print "sent"
+
+    def debug_navigation(self, packet):
+        data = packet.data
+
+        if data[0] == 0x0 and data[1] == 0x3:
+            print "Navitation packet:",
+
+            up     = (1,2,3)
+            down   = (4,5,6)
+            left   = (7,8,9)
+            right  = (10,11,12)
+            select = (13,14,15)
+            open_  = (32,)
+            ignore = tuple(range(16,31+1))
+            
+            dirc = data[2]
+            if dirc in up:
+                print "up",
+            elif dirc in down:
+                print "down",
+            elif dirc in left:
+                print "left",
+            elif dirc in right:
+                print "right",
+            elif dirc in select:
+                print "select",
+            elif dirc in open_:
+                print "open",
+            elif dirc in ignore:
+                print "ignore",
+
+            print "pos x: %i, pos y: %i"% (data[3], data[4])
+
+        else:
+            print "Not a navigation packet!"
 
     def communicate(self):
         nextRead = 1
@@ -250,8 +294,6 @@ class LiveViewManager(object):
             self.send_standby()
 
             while nextRead > 0:
-                time.sleep(0.1)
-
                 if self.fd.inWaiting() > 0:
                     tmp = self.fd.read(nextRead)
                 
@@ -259,7 +301,7 @@ class LiveViewManager(object):
                         nextRead = self.consume(tmp)
 
                         if self.packet is None: # end of prev. packet
-                            packet = self.packets[-1]
+                            packet = self.packets[-1] # last packet
 
                             if not packet.is_ack():
                                 print "Sending ACK..",
@@ -269,22 +311,42 @@ class LiveViewManager(object):
                                 
                                 print "sent"
 
-                            if packet.pId == Packet.BUTTON_LEFT:
+                            if packet.pId == Packet.STANDBY_REQUEST:
+                                if packet.data == [0x2]:
+                                    print "Standby mode: awake"
+                                elif packet.data == [0x1]:
+                                    print "Standby mode: in clock"
+                                elif packet.data == [0x0]:
+                                    print "Standby mode: sleeping"
+
                                 self.send_standby()
 
                             if packet.pId == Packet.TIME_REQUEST:
                                 print "Sending TIME_RESPONSE..",
                                 
-                                localtime = int(time.time()) + 2*3600 
-                                data = struct.pack(">LB", localtime,1)
+                                localtime = get_local_time()
+                                data = struct.pack(">LB", localtime,
+                                    self._24hour_clock)
 
                                 tmp = Packet(Packet.TIME_RESPONSE, len(data), data)
                                 self.send(tmp)
-
                                 print "sent"
-                                print "Localtime is:", localtime
 
                                 self.send_standby()
+                            
+                            if packet.pId == Packet.NAVIGATION_REQUEST:
+                                self.debug_navigation(packet)
+
+                                print "Sending NAVIGATION_RESPONSE..",
+
+                                tmp = Packet(Packet.NAVIGATION_RESPONSE, 1,
+                                             chr(0))
+                                self.send(tmp)
+                                print "sent"
+
+        except IOError as e:
+            print "Communication terminated:", e
+
         finally:
             self.fd.close()
         
