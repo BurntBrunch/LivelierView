@@ -11,10 +11,11 @@
   All numbers seem to be big-endian
 
 == Protocol ==
-  Server      LiveView
+  Server       LiveView
 
-          <-  MSG
-  ACK(44) ->
+           <-  MSG
+  ACK(44)  ->
+  RESPONSE ->
 
 
 == Time And Date Request (38) ==
@@ -24,7 +25,7 @@
   Response Id - 39 
   Payload - [Time in sec + Zone Offset + DST offset] [is24Hour - 1 or 0]
 
-== Hardware Buttons (7) ==
+== Screen State (7) ==
   id - 07
 
   data - 00 - screen off
