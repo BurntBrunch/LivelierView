@@ -351,8 +351,8 @@ class LiveViewManager(object):
                         break
 
                     if stdinman.vibrate():
-                        delayTime = 500
-                        onTime = 2000
+                        delayTime = 100
+                        onTime = 50
 
                         print "Vibrating for %i ms, delay %i ms.." % (onTime, delayTime),
                         
@@ -382,9 +382,7 @@ class LiveViewManager(object):
                                 print "sent"
 
                             if packet.pId == Packet.VIBRATE_RESPONSE:
-                                print "Got VIBRATE_RESPONSE."
-
-                                self.send_standby() # needed ? who knows..
+                                print "Got VIBRATE_RESPONSE"
 
                             if packet.pId == Packet.STANDBY_REQUEST:
                                 if packet.data == [0x2]:
