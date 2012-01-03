@@ -1,3 +1,5 @@
+# About #
+
 **LivelierView** is an attempt to reverse-engineer the LiveView Bluetooth protocol.
 
 # Current state #
@@ -7,6 +9,8 @@ The Python server can currently:
  * Identify LiveView devices
  * Set the time of the device
  * Keep it awake
+ * Make it vibrate
+ * Flash the LED
 
 
 # Requirements #
@@ -39,8 +43,7 @@ world read-/writeable. The latter is left as an exercise for the reader ;)
 resources the icons are coming from the phone) and customize it. 
 * Basic navigation/notification
 
-Very far into the future:* A less sandbox-y plugin system where plugins can sponteneously take over the
-  watch.
+Very far into the future:
 
 * A less sandbox-y plugin system where plugins can spontaneously take over the
   watch.
