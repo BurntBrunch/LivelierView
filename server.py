@@ -259,7 +259,7 @@ class LiveViewManager(object):
             self.packet = Packet()
             self.packet.pId = struct.unpack('>B', data)[0]
 
-            print "packet type: %i" % (self.packet.pId)
+            #print "packet type: %i" % (self.packet.pId)
 
             return 5 # byte 0x04 + 4 x bytes for size, in Big-Endian
         else:
@@ -270,17 +270,19 @@ class LiveViewManager(object):
                 assert four == 4
                 self.packet.length = length
 
-                print "packet length: %i" % (self.packet.length)
+                #print "packet length: %i" % (self.packet.length)
                 return self.packet.length
             else:
                 assert len(data) == self.packet.length
-                self.packet.data = map(ord, data)
+                self.packet.data = data
                 self.packets.append(self.packet)
 
-                print "packet data:",
+                """print "packet data:",
                 for i in self.packet.data:
                     print "%02X" % i, 
-                print ""
+                print "" """
+
+                print "Received packet: ", repr(self.packet)
 
                 self.packet = None
                 return 1
