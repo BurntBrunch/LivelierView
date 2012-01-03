@@ -63,10 +63,12 @@
 request id - 40
     payload
         byte 0-1: color in RGB565
-        byte 2-3: delay time
-        byte 4-5: "on" time
+        byte 2-3: delay time in ms
+        byte 4-5: "on" time in ms
 
 response id - 41
+    payload
+        byte 0 - 0x0
 
 == Vibrate Request (42) ==
 

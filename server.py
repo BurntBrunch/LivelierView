@@ -158,6 +158,9 @@ class Packet(object):
     NAVIGATION_REQUEST = 29
     NAVIGATION_RESPONSE = 30
 
+    LED_REQUEST = 40
+    LED_RESPONSE = 41
+
     VIBRATE_REQUEST = 42
     VIBRATE_RESPONSE = 43
 
@@ -214,8 +217,14 @@ class StdinManager(object):
     def vibrate(self):
         return self.key == 'v'
 
+    def led(self):
+        return self.key == 'l'
+
     def begin(self):
-        print "Starting server, commands are: (q)uit, (v)ibrate"
+        print "========================================================="
+        print "Starting server, commands are: (q)uit, (v)ibrate, (l)ed"
+        print "========================================================="
+
         self.__change_tty()
 
     def end(self):
@@ -235,7 +244,6 @@ class StdinManager(object):
 
         termios.tcsetattr(fd, termios.TCSADRAIN, new)
 
-
     def __revert_tty(self):
         """ This method reverts the changes done by __change_tty() """
         fd = sys.stdin.fileno()
@@ -244,6 +252,14 @@ class StdinManager(object):
 class LiveViewManager(object):
     def __init__(self, tty):
         self._24hour_clock = False
+        
+        self.vibrateOnTime = 50
+        self.vibrateDelayTime = 100
+
+        self.ledOnTime = 250
+        self.ledDelayTime = 100
+        self.ledColor = (31, 63, 31)
+
         self.tty = tty
         self.fd = serial.Serial(self.tty, 4800, timeout=0, rtscts=1)
 
@@ -351,15 +367,34 @@ class LiveViewManager(object):
                         break
 
                     if stdinman.vibrate():
-                        delayTime = 100
-                        onTime = 50
-
-                        print "Vibrating for %i ms, delay %i ms.." % (onTime, delayTime),
+                        print "Vibrating for %i ms, delay %i ms.." % (
+                            self.vibrateOnTime, self.vibrateDelayTime),
                         
                         # pack the times as unsigned shorts
-                        data = struct.pack(">HH", delayTime, onTime)
+                        data = struct.pack(">HH", self.vibrateDelayTime, self.vibrateOnTime)
 
                         tmp = Packet(Packet.VIBRATE_REQUEST, len(data), data)
+                        self.send(tmp)
+
+                        print "sent"
+
+                    if stdinman.led():
+                        print "LED on for %i ms, delay %i ms, R%i G%i B%i.." % (
+                            self.ledOnTime, self.ledDelayTime,
+                            self.ledColor[0], self.ledColor[1],
+                            self.ledColor[2]),
+                        
+                        red, green, blue = self.ledColor
+
+                        # pack the colors as RGB 565
+                        color = (red & 31) << 11 |\
+                                (green & 63) << 5 |\
+                                (blue & 31)
+
+                        data = struct.pack(">HHH", color, self.ledDelayTime,
+                                           self.ledOnTime)
+
+                        tmp = Packet(Packet.LED_REQUEST, len(data), data)
                         self.send(tmp)
 
                         print "sent"
@@ -383,6 +418,11 @@ class LiveViewManager(object):
 
                             if packet.pId == Packet.VIBRATE_RESPONSE:
                                 print "Got VIBRATE_RESPONSE"
+                                assert packet.data == chr(0x0)
+
+                            if packet.pId == Packet.LED_RESPONSE:
+                                print "Got LED_RESPONSE"
+                                assert packet.data == chr(0x0)
 
                             if packet.pId == Packet.STANDBY_REQUEST:
                                 if packet.data == [0x2]:
