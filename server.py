@@ -158,6 +158,9 @@ class Packet(object):
     NAVIGATION_REQUEST = 29
     NAVIGATION_RESPONSE = 30
 
+    VIBRATE_REQUEST = 42
+    VIBRATE_RESPONSE = 43
+
     def __init__(self, pId = None, length = None, data = None):
         self.pId = pId
         self.length = length
@@ -189,7 +192,6 @@ class Packet(object):
         else:
             return "<Packet: id %i, length %i>" % ( self.pId,
                 self.length)
-
 
     def __str__(self):
         if self.length > 0:
@@ -329,8 +331,6 @@ class LiveViewManager(object):
         else:
             print "Not a navigation packet!"
 
-    
-        
     def communicate(self):
         nextRead = 1
         stdinman = StdinManager()
@@ -349,7 +349,18 @@ class LiveViewManager(object):
                         break
 
                     if stdinman.vibrate():
-                        print "Should vibrate.. BRRRRR" 
+                        delayTime = 500
+                        onTime = 2000
+
+                        print "Vibrating for %i ms, delay %i ms.." % (onTime, delayTime),
+                        
+                        # pack the times as unsigned shorts
+                        data = struct.pack(">HH", delayTime, onTime)
+
+                        tmp = Packet(Packet.VIBRATE_REQUEST, len(data), data)
+                        self.send(tmp)
+
+                        print "sent"
 
                 if self.fd in seqin and self.fd.inWaiting() > 0:
                     tmp = self.fd.read(nextRead)
@@ -367,6 +378,11 @@ class LiveViewManager(object):
                                 self.send(tmp)
                                 
                                 print "sent"
+
+                            if packet.pId == Packet.VIBRATE_RESPONSE:
+                                print "Got VIBRATE_RESPONSE."
+
+                                self.send_standby() # needed ? who knows..
 
                             if packet.pId == Packet.STANDBY_REQUEST:
                                 if packet.data == [0x2]:

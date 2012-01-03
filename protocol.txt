@@ -68,6 +68,17 @@ request id - 40
 
 response id - 41
 
+== Vibrate Request (42) ==
+
+request id - 42
+    payload
+        byte 0-1: delay time in ms
+        byte 2-3: "on" time in ms
+
+response id - 43
+    payload
+        byte 0 - 0x0
+
 == SW Version Request (68) ==
 
 request id - 68
