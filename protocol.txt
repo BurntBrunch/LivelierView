@@ -22,18 +22,23 @@
   The LiveView device will issue a Time And Date Request if it 
   doesn't have the current time set.
 
-  Response Id - 39 
-  Payload - [Time in sec + Zone Offset + DST offset] [is24Hour - 1 or 0]
+  response Id - 39 
+  payload - 
+    byte 0-3 - time in seconds since the Epoch + zone offset + DST offset
+    byte   4 - is a 24-hour clock - 1 or 0
 
 == Screen State (7) ==
-  id - 07
+  packet id - 07
 
-  data - 00 - screen off
-         01 - screen on
-         02 - right button while screen on
+  payload - 
+    byte 0
+      0x0 - screen off
+      0x1 - screen on
+      0x2 - right button while screen on
 
 == Navigation Request (29) ==
   request id - 29
+  
   payload - 
     byte 0 - 0x0
     byte 1 - 0x3
@@ -52,39 +57,42 @@
 
   response id - 30
   payload
-    byte 0 - 0x0 - ok
-             0x1 - error (actually means Unknown, but assuming as error is also correct)
-             0x2 - no memory
-             0x3 - ok exit
-             0x4 - ok cancel
+    byte 0
+      0x0 - ok
+      0x1 - error (actually means Unknown, but assuming as error is also correct)
+      0x2 - no memory
+      0x3 - ok exit
+      0x4 - ok cancel
 
 == LED Request (40) ==
 
 request id - 40
-    payload
-        byte 0-1: color in RGB565
-        byte 2-3: delay time in ms
-        byte 4-5: "on" time in ms
+  payload
+    byte 0-1: color in RGB565
+    byte 2-3: delay time in ms
+    byte 4-5: "on" time in ms
 
 response id - 41
-    payload
-        byte 0 - 0x0
+  payload
+    byte 0 - 0x0
 
 == Vibrate Request (42) ==
 
 request id - 42
-    payload
-        byte 0-1: delay time in ms
-        byte 2-3: "on" time in ms
+  payload
+    byte 0-1: delay time in ms
+    byte 2-3: "on" time in ms
 
 response id - 43
-    payload
-        byte 0 - 0x0
+  payload
+    byte 0 - 0x0
 
 == SW Version Request (68) ==
 
 request id - 68
 
 response id - 69
-    payload: WILL BE LIKE "0.0.3".getBytes("iso-8859-1")
+  payload: WILL BE LIKE "0.0.3".getBytes("iso-8859-1")
 
+
+// vim: set expandtab ts=2 sw=2
