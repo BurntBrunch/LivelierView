@@ -38,13 +38,14 @@
     byte 0 - 0x0
     byte 1 - 0x3
       byte 2 - navigation
-        13,14,15 - select
-        1,2,3    - up
-        4,5,6    - down
-        7,8,9    - left
-        10,11,12 - right
-        32       - open
+        13,14,15 - select, select long, select double
+        1,2,3    - up, up long, up double
+        4,5,6    - down, down long, down double
+        7,8,9    - left, left long, left double
+        10,11,12 - right, right long, right double
         16 - 31  - ignore
+        32       - open in phone
+        0        - invalid
 
       byte 3 - position X
       byte 4 - position Y
@@ -52,7 +53,22 @@
   response id - 30
   payload
     byte 0 - 0x0 - ok
-             0x1 - error
+             0x1 - error (actually means Unknown, but assuming as error is also correct)
+             0x2 - no memory
              0x3 - ok exit
              0x4 - ok cancel
+
+== LED Request (38) ==
+
+request id - 38
+	data - ?? (RGB + delay + on_state )
+
+response id - 41
+
+== SW Version Request (68) ==
+
+request id - 68
+
+response id - 69
+payload: WILL BE LIKE "0.0.3".getBytes("iso-8859-1")
 
