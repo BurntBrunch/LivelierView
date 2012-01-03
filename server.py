@@ -1,9 +1,19 @@
+import calendar
+import select
+import struct
+import sys
+import termios
+import time
+
 import dbus
+import serial
 
 from gobject import *
 from dbus.mainloop.glib import DBusGMainLoop
 
 class FlushDescr:
+    """ A nifty class that makes a buffered stream unbuffered by 
+        explicitly flushing it after every IO op """
     def __init__(self, fd):
         self.fd = fd
 
@@ -22,32 +32,21 @@ class FlushDescr:
         self.fd.flush()
         self.fd.close(*args, **kwargs)
 
-import sys
-import struct
-import time
-import calendar
-import serial
-sys.stdout = FlushDescr(sys.stdout)
 
+# Make stdout unbuffered - makes `print` instantaneous
+sys.stdout = FlushDescr(sys.stdout)
 
 DBusGMainLoop(set_as_default=True)
 
-def get_local_time():
-    return calendar.timegm(time.localtime())
-
-def get_adapter():
-    bus = dbus.SystemBus()
-    name = bus.get_object('org.bluez',
-        '/').DefaultAdapter(dbus_interface='org.bluez.Manager')
-    
-    return name
 
 class DeviceManager(object):
     UUID = "00001101-0000-1000-8000-00805F9B34FB"
 
     def __init__(self):
-        self.adapter_name = get_adapter()
         self.bus = dbus.SystemBus()
+        self.adapter_name = self.bus.get_object('org.bluez',
+            '/').DefaultAdapter(dbus_interface='org.bluez.Manager')
+
         self.adapter = self.bus.get_object('org.bluez',
             self.adapter_name)
         self.adapter_iface = dbus.Interface(self.adapter, 'org.bluez.Adapter')
@@ -198,6 +197,48 @@ class Packet(object):
         else:
             return struct.pack(">BBI", self.pId, 4, 0)
 
+class StdinManager(object):
+    def __init__(self):
+        self.key = None
+
+    def read(self):
+        key = sys.stdin.read(1)
+
+        self.key = key.lower()
+
+    def quit(self):
+        return self.key == 'q'
+    
+    def vibrate(self):
+        return self.key == 'v'
+
+    def begin(self):
+        print "Starting server, commands are: (q)uit, (v)ibrate"
+        self.__change_tty()
+
+    def end(self):
+        self.__revert_tty()
+        print "Server stopped."
+    
+    def __change_tty(self):
+        """ This method changes the controlling terminal, so that characters
+        can be read before a new line (aka non-canonical mode) and they are not
+        echoed as they are typed """
+        fd = sys.stdin.fileno()
+        self.old_stdin = termios.tcgetattr(fd)
+        new = termios.tcgetattr(fd)
+
+        # disable echoing
+        new[3] = new[3] & ~(termios.ECHO | termios.ICANON)         # lflags
+
+        termios.tcsetattr(fd, termios.TCSADRAIN, new)
+
+
+    def __revert_tty(self):
+        """ This method reverts the changes done by __change_tty() """
+        fd = sys.stdin.fileno()
+        termios.tcsetattr(fd, termios.TCSADRAIN, self.old_stdin)
+
 class LiveViewManager(object):
     def __init__(self, tty):
         self._24hour_clock = False
@@ -288,13 +329,29 @@ class LiveViewManager(object):
         else:
             print "Not a navigation packet!"
 
+    
+        
     def communicate(self):
         nextRead = 1
+        stdinman = StdinManager()
+
         try:
+            stdinman.begin()
             self.send_standby()
 
             while nextRead > 0:
-                if self.fd.inWaiting() > 0:
+                (seqin, seqout, seqex) = select.select([self.fd, sys.stdin],
+                                                       [], [])
+                if sys.stdin in seqin:
+                    stdinman.read()
+
+                    if stdinman.quit():
+                        break
+
+                    if stdinman.vibrate():
+                        print "Should vibrate.. BRRRRR" 
+
+                if self.fd in seqin and self.fd.inWaiting() > 0:
                     tmp = self.fd.read(nextRead)
                 
                     if len(tmp) > 0:
@@ -324,7 +381,9 @@ class LiveViewManager(object):
                             if packet.pId == Packet.TIME_REQUEST:
                                 print "Sending TIME_RESPONSE..",
                                 
-                                localtime = get_local_time()
+                                # time in seconds since the Epoch, in local
+                                # time zone, with DST taken into account
+                                localtime = calendar.timegm(time.localtime())
                                 data = struct.pack(">LB", localtime,
                                     self._24hour_clock)
 
@@ -349,17 +408,14 @@ class LiveViewManager(object):
 
         finally:
             self.fd.close()
+
+            stdinman.end()
         
 
 if __name__ == "__main__":
-    loop = gobject.MainLoop()
-
     man = DeviceManager()
     man.initialize()
     devs = man.get_liveview_devices()
 
     if len(devs) > 0:
         man.connect_to_first_device()
-
-    timeout_add(10000, lambda: loop.quit())
-    loop.run()
