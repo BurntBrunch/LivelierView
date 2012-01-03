@@ -58,10 +58,13 @@
              0x3 - ok exit
              0x4 - ok cancel
 
-== LED Request (38) ==
+== LED Request (40) ==
 
-request id - 38
-	data - ?? (RGB + delay + on_state )
+request id - 40
+    payload
+        byte 0-1: color in RGB565
+        byte 2-3: delay time
+        byte 4-5: "on" time
 
 response id - 41
 
@@ -70,5 +73,5 @@ response id - 41
 request id - 68
 
 response id - 69
-payload: WILL BE LIKE "0.0.3".getBytes("iso-8859-1")
+    payload: WILL BE LIKE "0.0.3".getBytes("iso-8859-1")
 
