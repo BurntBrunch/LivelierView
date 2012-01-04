@@ -164,6 +164,12 @@ class Packet(object):
     VIBRATE_REQUEST = 42
     VIBRATE_RESPONSE = 43
 
+    CLEAR_DISPLAY_REQUEST = 21
+    CLEAR_DISPLAY_RESPONSE = 22
+
+    DISPLAY_PROPERTIES_REQUEST = 1
+    DISPLAY_PROPERTIES_RESPONSE = 2
+
     def __init__(self, pId = None, length = None, data = None):
         self.pId = pId
         self.length = length
@@ -220,10 +226,13 @@ class StdinManager(object):
     def led(self):
         return self.key == 'l'
 
+    def clear(self):
+        return self.key == 'c'
+
     def begin(self):
-        print "========================================================="
-        print "Starting server, commands are: (q)uit, (v)ibrate, (l)ed"
-        print "========================================================="
+        print "=================================================================="
+        print "Starting server, commands are: (q)uit, (v)ibrate, (l)ed, (c)lear"
+        print "=================================================================="
 
         self.__change_tty()
 
@@ -250,6 +259,8 @@ class StdinManager(object):
         termios.tcsetattr(fd, termios.TCSADRAIN, self.old_stdin)
 
 class LiveViewManager(object):
+    SW_VERSION = "0.0.3"
+    
     def __init__(self, tty):
         self._24hour_clock = False
         
@@ -349,6 +360,23 @@ class LiveViewManager(object):
         else:
             print "Not a navigation packet!"
 
+    def debug_dpr(self,packet):
+        data = packet.data
+
+        data = struct.unpack(">10B B %is" % (len(data) - 11) , data)
+        (width, height, sbWidth, sbHeight, viewWidth, viewHeight, aWidth,
+         aHeight, textChunkSize, idleTimer, stopbyte, version) = data
+
+        print "Width Height sbWidth sbHeight viewWidth viewHeight"
+        print "%5i %6i %7i %8i %9i %10i" % ( width, height, sbWidth, sbHeight,
+                                            viewWidth, viewHeight)
+        
+        print "aWidth aHeight textChunk idleTimer"
+        print "%6i %7i %9i %9i" % (aWidth, aHeight, textChunkSize, idleTimer)
+
+        print "Software version: '%s'" % (version)
+        
+
     def communicate(self):
         nextRead = 1
         stdinman = StdinManager()
@@ -356,6 +384,13 @@ class LiveViewManager(object):
         try:
             stdinman.begin()
             self.send_standby()
+
+            print "Sending DPR..",
+            data = LiveViewManager.SW_VERSION
+            data = struct.pack('>%is' % (len(data) + 1), data)
+            tmp = Packet(Packet.DISPLAY_PROPERTIES_REQUEST, len(data), data)
+            self.send(tmp)
+            print "sent"
 
             while nextRead > 0:
                 (seqin, seqout, seqex) = select.select([self.fd, sys.stdin],
@@ -399,7 +434,16 @@ class LiveViewManager(object):
 
                         print "sent"
 
+                    if stdinman.clear():
+                        print "Clearing display..",
+                        
+                        tmp = Packet(Packet.CLEAR_DISPLAY_REQUEST, 0, '')
+                        self.send(tmp)
+                        
+                        print "sent"
+
                 if self.fd in seqin and self.fd.inWaiting() > 0:
+                    assert self.fd.inWaiting() >= nextRead
                     tmp = self.fd.read(nextRead)
                 
                     if len(tmp) > 0:
@@ -416,13 +460,19 @@ class LiveViewManager(object):
                                 
                                 print "sent"
 
-                            if packet.pId == Packet.VIBRATE_RESPONSE:
-                                print "Got VIBRATE_RESPONSE"
-                                assert packet.data == chr(0x0)
+                            packet_nops = {
+                                Packet.VIBRATE_RESPONSE: "VIBRATE_RESPONSE",
+                                Packet.LED_RESPONSE: "LED_RESPONSE",
+                                Packet.CLEAR_DISPLAY_RESPONSE: "CLEAR_DISPLAY_RESPONSE",
+                            }
 
-                            if packet.pId == Packet.LED_RESPONSE:
-                                print "Got LED_RESPONSE"
-                                assert packet.data == chr(0x0)
+                            if packet.pId in packet_nops:
+                                print "Got %s" % (packet_nops[packet.pId],)
+
+                            if packet.pId == Packet.DISPLAY_PROPERTIES_RESPONSE:
+                                print "Got DISPLAY_PROPERTIES_RESPONSE"
+                                self.debug_dpr(packet)
+                                self.send_standby()
 
                             if packet.pId == Packet.STANDBY_REQUEST:
                                 if packet.data == [0x2]:
