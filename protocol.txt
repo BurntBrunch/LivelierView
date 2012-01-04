@@ -66,33 +66,64 @@
 
 == LED Request (40) ==
 
-request id - 40
+  request id - 40
   payload
     byte 0-1: color in RGB565
     byte 2-3: delay time in ms
     byte 4-5: "on" time in ms
 
-response id - 41
+  response id - 41
   payload
     byte 0 - 0x0
 
 == Vibrate Request (42) ==
 
-request id - 42
+  request id - 42
   payload
     byte 0-1: delay time in ms
     byte 2-3: "on" time in ms
 
-response id - 43
+  response id - 43
   payload
     byte 0 - 0x0
 
 == SW Version Request (68) ==
 
-request id - 68
+  request id - 68
 
-response id - 69
+  response id - 69
   payload: WILL BE LIKE "0.0.3".getBytes("iso-8859-1")
+
+== Clear Display Request (21) ==
+Not sure how this works - doesn't seem to work in the normal mode
+
+  request id - 21
+  no payload
+
+  response id - 22
+
+== Display Properties Request (1) ==
+
+  request id - 1
+  payload
+    byte 0-end - null-terminated version string, e.g., '0.0.3\0'
+
+  response id - 2
+  payload
+    byte 0      - width
+    byte 1      - height
+    byte 2      - status bar width
+    byte 3      - status bar height
+    byte 4      - view width
+    byte 5      - view height
+    byte 6      - announce width
+    byte 7      - announce height
+    byte 8      - text chunk size
+    byte 9      - idle timer
+    
+    byte 10     - stop byte?
+
+    byte 11-15  - sw version
 
 
 // vim: set expandtab ts=2 sw=2
