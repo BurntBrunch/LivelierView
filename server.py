@@ -367,6 +367,7 @@ class LiveViewManager(object):
         (width, height, sbWidth, sbHeight, viewWidth, viewHeight, aWidth,
          aHeight, textChunkSize, idleTimer, stopbyte, version) = data
 
+        print "\nParsing response - (a* = announce*, sb* = status bar*)"
         print "Width Height sbWidth sbHeight viewWidth viewHeight"
         print "%5i %6i %7i %8i %9i %10i" % ( width, height, sbWidth, sbHeight,
                                             viewWidth, viewHeight)
@@ -374,7 +375,7 @@ class LiveViewManager(object):
         print "aWidth aHeight textChunk idleTimer"
         print "%6i %7i %9i %9i" % (aWidth, aHeight, textChunkSize, idleTimer)
 
-        print "Software version: '%s'" % (version)
+        print "Software version: '%s'\n" % (version,)
         
 
     def communicate(self):
