@@ -170,6 +170,9 @@ class Packet(object):
     DISPLAY_PROPERTIES_REQUEST = 1
     DISPLAY_PROPERTIES_RESPONSE = 2
 
+    SW_VERSION_REQUEST = 68
+    SW_VERSION_RESPONSE = 69
+
     def __init__(self, pId = None, length = None, data = None):
         self.pId = pId
         self.length = length
@@ -377,7 +380,6 @@ class LiveViewManager(object):
 
         print "Software version: '%s'\n" % (version,)
         
-
     def communicate(self):
         nextRead = 1
         stdinman = StdinManager()
@@ -473,7 +475,23 @@ class LiveViewManager(object):
                             if packet.pId == Packet.DISPLAY_PROPERTIES_RESPONSE:
                                 print "Got DISPLAY_PROPERTIES_RESPONSE"
                                 self.debug_dpr(packet)
-                                self.send_standby()
+
+                                # following the protocol from the official
+                                # software
+
+                                print "Sending SW_VERSION_REQUEST..",
+                                tmp = Packet(Packet.SW_VERSION_REQUEST, 1,
+                                             chr(0))
+                                self.send(tmp)
+                                print "sent"
+
+                            if packet.pId == Packet.SW_VERSION_RESPONSE:
+                                print "Got SW_VERSION_RESPONSE:",
+
+                                self.sw_version = struct.unpack(">%is" %
+                                                                packet.length,
+                                                                packet.data)[0]
+                                print self.sw_version
 
                             if packet.pId == Packet.STANDBY_REQUEST:
                                 if packet.data == [0x2]:
